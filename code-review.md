@@ -19,13 +19,6 @@ README 第 196 行写的四条依赖规则，逐条核对：
 逐段对照：`pending` Map、`retire()`、`watchAbort()`、`onRequest()` 里那四道检查（有没有当前会话 → 是不是当前会话 → 这一轮是不是飞书发起的 → 发卡）→ `sendCard` 之后补一刀作废的竞态分支 → `onCardAction()` 的「不在册」路径，形状完全一样，只有「交回什么」不同（`question.js:145` reject error，`approval.js:143` resolve 决议词）。
 项目已经为「选择卡」抽过同类的骨架（`handler/feishu/option-card-flow.js`，5 个 handler 共用）；`handler/host/` 这边缺一个对应的件。这是当前最值得动的一处重复。
 
-**9. `infra/host/` 取宿主服务有三种写法并存**
-- `access.method(ns, name)`：`session.js:144,171,196,214,233`、`models.js:55,76,96`、`permissions.js:38`
-- `ctx.get()` 现取：`session.js:33,69`、`workspace.js:19,47`、`models.js:80`
-- 装配时注入服务对象：`index.js:65,67,74`（`settings`、`credentials`）
-
-`service-access.js` 的用途是「按名字借一个绑好 `this` 的方法」，但只覆盖了一部分；同一个 `sessionController` 在 `models.js` 里一会儿走 `access`、一会儿走 `ctx.get('sessionProjections')`。
-
 ## 三、P3：轻微
 
 - `lib/common/events/` 这个目录下只有 `feishu-event.js` 一个文件；`common/` 一共 2 个文件 33 行。
