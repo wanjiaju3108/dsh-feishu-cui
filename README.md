@@ -174,7 +174,7 @@ dsh-feishu-cui/
     ├── cache/                6 个文件   223 行   需要跨文件读写的运行期状态
     ├── common/               4 个文件   411 行   文案总表、飞书事件、CUI 事件、凭据引用名
     ├── driving/              6 个文件   555 行   判定与分派（飞书那头 / 宿主那头）
-    ├── handler/             15 个文件  2128 行   干活：菜单、卡片、回答、反问、审批、通知
+    ├── handler/             16 个文件  2149 行   干活：菜单、卡片、回答、反问、审批、通知
     ├── infra/               11 个文件  1001 行   跟外面打交道：飞书出站、宿主服务、插件配置
     ├── settings/             4 个文件   673 行   设置页（三条回环路由 + 浏览器半边）
     ├── transport/            6 个文件   284 行   连接：飞书长连接 / REST，宿主事件订阅、waterfall
@@ -186,7 +186,7 @@ dsh-feishu-cui/
 - **`lib/index.js`**：唯一的入口。`apply()` 里按顺序造出所有对象、把依赖递进去（transport → push → 各 handler → 路由 → 准入 → 两条宿主事件订阅 + 两条 waterfall 订阅），注册设置页，最后按凭据建连。**不写业务**。
 - **`transport/`**：门外那一段。`feishu/` 是飞书侧（`websocket-client.js` 长连接与心跳看门狗、`http-client.js` REST、`transport.js` 把两个客户端一起持有、换凭据时整组重建）；`host/` 是宿主侧（`session-events.js` 订 `session/event`、`agent-events.js` 订收件箱三条、`waterfall.js` 订要人答的两条 waterfall）。
 - **`driving/`**：判定和分派。`feishu/` 把飞书原始事件转成 CUI 事件（`receiver.js`）、判准入（`admission.js`：去重、迟到、鉴权、只认文本、有没有当前会话）、按事件分给处理函数（`router.js`）；`host/` 对宿主事件做同样三件事，`router.js` 只把要盯的那几种事件分给 `handler/host/`。
-- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（六个菜单各一张卡 + `option-card-flow.js` 那套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
+- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（六个菜单各一张卡 + `option-card-flow.js` 那套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
 - **`infra/`**：跟外面的接口。`feishu/push.js` 发出站（发卡 / 换卡，失败重试）；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
 - **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
