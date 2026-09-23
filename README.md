@@ -182,7 +182,6 @@ dsh plugin --profile web add dsh-feishu-cui
 dsh-feishu-cui/
 ├── package.json        三条脚本：check（对每个模块 node --check）、test（回归用例）、prepublishOnly（发布前跑前两条）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
-├── ci/                 1 个文件    45 行   把仓库同步到 GitHub 的脚本（codeup 流水线里调它）
 ├── test/               21 个文件  2119 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
 └── lib/
     ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
