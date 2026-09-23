@@ -171,7 +171,7 @@ dsh plugin --profile web add link:/Users/vsai/IdeaProjects/dsh-feishu-cui
 dsh-feishu-cui/
 ├── package.json        两条脚本：check（对每个模块 node --check）、test（跑 test/ 下的回归用例）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
-├── test/               13 个文件  1080 行   回归用例：不起插件、不联网，假宿主 + 假出站
+├── test/               21 个文件  2119 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
 └── lib/
     ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
     ├── notices.js            1 个文件    73 行   给绑定的人发卡：连上通告、解绑
@@ -200,7 +200,7 @@ dsh-feishu-cui/
 
 依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`、`common/`（文案在 `common/copy.js`），`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
 
-改完跑两条：`npm run check`（每个模块过一遍 `node --check`）、`npm test`（跑 `test/` 下的回归用例：假宿主 + 假出站，不起插件、不联网，一秒跑完）。
+改完跑两条：`npm run check`（每个模块过一遍 `node --check`）、`npm test`（跑 `test/` 下的 17 个用例，全部不联网）。用例分两档：`*-check.mjs` 里的单元那份只造要测的那几个对象（假出站、假会话目录）；端到端那份（`connection` / `no-credentials` / `inbound` / `answer-card` / `waterfall` / `settings-routes`）用 `harness.mjs` 的 `startPlugin()` 真调一遍 `apply()`，把上下文、宿主服务和飞书 SDK 都换成假的（`fake-lark.mjs` 配 `lark-hooks.mjs` 顶掉那个 SDK）。
 
 ## 用例脉络
 
