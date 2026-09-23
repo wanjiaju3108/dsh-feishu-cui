@@ -174,9 +174,9 @@ dsh-feishu-cui/
     ├── init.js               1 个文件    22 行   连上之后给 owner 发通告
     ├── cache/                6 个文件   223 行   运行期状态（只在内存里）
     ├── common/               3 个文件    40 行   飞书事件、CUI 事件、凭据引用名
-    ├── driving/              6 个文件   556 行   判定与分派（飞书那头 / 宿主那头）
-    ├── handler/             15 个文件  2068 行   干活：菜单、卡片、回答、反问、审批、通知
-    ├── infra/               11 个文件   997 行   跟外面打交道：飞书出站、宿主服务、插件配置
+    ├── driving/              6 个文件   555 行   判定与分派（飞书那头 / 宿主那头）
+    ├── handler/             15 个文件  2128 行   干活：菜单、卡片、回答、反问、审批、通知
+    ├── infra/               11 个文件  1001 行   跟外面打交道：飞书出站、宿主服务、插件配置
     ├── settings/             4 个文件   657 行   设置页（三条回环路由 + 浏览器半边）
     ├── transport/            6 个文件   284 行   连接：飞书长连接 / REST，宿主事件订阅、waterfall
     └── ui/                   6 个文件   501 行   卡片长什么样（只出 JSON）
@@ -194,7 +194,7 @@ dsh-feishu-cui/
 - **`copy.js`**：全部文案。
 - **`settings/`**：设置页。三条回环路由（`state` / `credentials` / `user/unbind`，只判回环和 JSON，不做身份校验）+ 浏览器半边。
 
-依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`，`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
+依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`，`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
 
 ## 用例脉络
 
