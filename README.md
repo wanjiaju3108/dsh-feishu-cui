@@ -169,15 +169,14 @@ dsh-feishu-cui/
 ├── package.json        一条 check 脚本（对每个模块 node --check）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
 └── lib/
-    ├── index.js              1 个文件   199 行   装配：造对象、接线、生命周期
-    ├── copy.js               1 个文件   379 行   给人看的文案总表
-    ├── init.js               1 个文件    22 行   连上之后给 owner 发通告
-    ├── cache/                6 个文件   223 行   运行期状态（只在内存里）
-    ├── common/               3 个文件    40 行   飞书事件、CUI 事件、凭据引用名
+    ├── index.js              1 个文件   190 行   装配：造对象、接线、生命周期
+    ├── init.js               1 个文件    57 行   给绑定的人发卡：连上通告、解绑告知
+    ├── cache/                6 个文件   223 行   需要跨文件读写的运行期状态
+    ├── common/               4 个文件   411 行   文案总表、飞书事件、CUI 事件、凭据引用名
     ├── driving/              6 个文件   555 行   判定与分派（飞书那头 / 宿主那头）
     ├── handler/             15 个文件  2128 行   干活：菜单、卡片、回答、反问、审批、通知
     ├── infra/               11 个文件  1001 行   跟外面打交道：飞书出站、宿主服务、插件配置
-    ├── settings/             4 个文件   657 行   设置页（三条回环路由 + 浏览器半边）
+    ├── settings/             4 个文件   673 行   设置页（三条回环路由 + 浏览器半边）
     ├── transport/            6 个文件   284 行   连接：飞书长连接 / REST，宿主事件订阅、waterfall
     └── ui/                   6 个文件   501 行   卡片长什么样（只出 JSON）
 ```
@@ -190,11 +189,11 @@ dsh-feishu-cui/
 - **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（六个菜单各一张卡 + `option-card-flow.js` 那套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
 - **`infra/`**：跟外面的接口。`feishu/push.js` 发出站（发卡 / 换卡，失败重试）；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
-- **`cache/`**：运行期状态，只在内存里——在册的卡片、正在跑的那一轮、已处理的飞书消息、配对码、设置句柄、铸号。
-- **`copy.js`**：全部文案。
+- **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
+- **`common/`**：各层共用的形状、常量与文案——CUI 事件（`cui-event-schema.js`）、飞书事件名（`events/feishu-event.js`）、凭据引用名（`credential-refs.js`）、给人看的文案总表（`copy.js`）。
 - **`settings/`**：设置页。三条回环路由（`state` / `credentials` / `user/unbind`，只判回环和 JSON，不做身份校验）+ 浏览器半边。
 
-依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`，`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
+依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`、`common/`（文案在 `common/copy.js`），`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
 
 ## 用例脉络
 
