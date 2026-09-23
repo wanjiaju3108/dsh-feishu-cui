@@ -19,15 +19,6 @@ README 第 196 行写的四条依赖规则，逐条核对：
 逐段对照：`pending` Map、`retire()`、`watchAbort()`、`onRequest()` 里那四道检查（有没有当前会话 → 是不是当前会话 → 这一轮是不是飞书发起的 → 发卡）→ `sendCard` 之后补一刀作废的竞态分支 → `onCardAction()` 的「不在册」路径，形状完全一样，只有「交回什么」不同（`question.js:145` reject error，`approval.js:143` resolve 决议词）。
 项目已经为「选择卡」抽过同类的骨架（`handler/feishu/option-card-flow.js`，5 个 handler 共用）；`handler/host/` 这边缺一个对应的件。这是当前最值得动的一处重复。
 
-**6. 卡片类型常量两处定义**
-`handler/*.js` 里 8 个（`SESSION_LIST_KEY`、`WORKSPACES_KEY`、`MODEL_KEY`、`EFFORT_KEY`、`PERMISSION_KEY`、`PAIRING_KEY`、`BALANCE_KEY`、`QUESTION_CARD_KEY`），`ui/*.js` 里 2 个（`ANSWER_CARD_KEY`、`APPROVAL_CARD_KEY`）。`QUESTION_CARD_KEY` 之所以在 handler 里，是因为反问卡复用 `ui/option-card.js`、没有自己的 ui 文件。同一个概念（发卡时写进 `value.tag`、回调时按它路由）分散在两个层、两种放法。
-
-**7. 转换层依赖某个 handler 的兴趣清单**
-`lib/driving/host/receiver.js:3,57` import `handler/host/settings-watch.js` 的 `WATCHED_SESSION_EVENTS`，用它决定「这条事件要不要把 `settings` 载荷一起带出来」；`driving/host/router.js:3,16` 又 import 同一个常量做路由。往后加一个被盯的事件，要同时改 `receiver`（载荷）和 `router`（路由）——这两处本来可以只由路由表决定。
-
-**8. `index.js` 里有业务，`init.js` 位置尴尬**
-`README.md:186` 说 `index.js`「不写业务」，但 `lib/index.js:122-131`（`announceConnected`：选文案、查标题）和 `lib/index.js:161-172`（`unbindUser`：清设置、作废配对码、发解绑卡）都是业务。而 `init.js`（22 行，只做「找绑定的人 + 发卡」）只被 `lib/index.js:31,127` 用一次——一个通告动作被切成「顶层 init.js + index.js 里的文案决策」两半。
-
 **9. `infra/host/` 取宿主服务有三种写法并存**
 - `access.method(ns, name)`：`session.js:144,171,196,214,233`、`models.js:55,76,96`、`permissions.js:38`
 - `ctx.get()` 现取：`session.js:33,69`、`workspace.js:19,47`、`models.js:80`
