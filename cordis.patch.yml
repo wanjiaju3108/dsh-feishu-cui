@@ -1,0 +1,10 @@
+# dsh-feishu-cui bundle patch：把本插件插进 profile 的 loader 栈。
+- insert:
+    - id: feishu-cui
+      name: 'dsh-feishu-cui'
+
+# 凭据读 DSH 凭据存储（$DSH_HOME/.credentials.yaml）：
+#   FEISHU_CUI_APP_ID / FEISHU_CUI_APP_SECRET
+#
+# 名字和 dsh-feishu-assistant 用的 FEISHU_APP_ID / FEISHU_APP_SECRET 刻意分开：
+# 两个插件读同一个 ref 就是同一个飞书应用，同一 App 的多条长连接会被飞书随机分发事件。
