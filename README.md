@@ -52,8 +52,19 @@
 ### 安装与前置
 
 ```sh
-dsh plugin --profile web add link:/Users/vsai/IdeaProjects/dsh-feishu-cui
+dsh plugin --profile web add dsh-feishu-cui
 ```
+
+装完重启 `dsh web`。装在别的 profile 上就把 `--profile` 换成那个名字；本机改这个插件自己的代码时，用 `link:` 指到仓库目录也一样。
+
+> **装的时候如果收尾报 `ERR_PNPM_IGNORED_BUILDS: protobufjs`，插件其实没装上。**
+> `@larksuiteoapi/node-sdk` 的依赖里有 `protobufjs`，它带 postinstall 脚本，pnpm 默认不跑；dsh 把 pnpm 的非零退出当成整体失败，于是没把插件登记进 profile。先放行再装一次：
+>
+> ```yaml
+> # ~/.dsh/profiles/<profile>/pnpm-workspace.yaml
+> allowBuilds:
+>   protobufjs: true
+> ```
 
 插件分两半：宿主半边 `lib/index.js` 跟着 `dsh web` 加载；浏览器半边是设置页，插件装上后在 DSH 的 Web 界面里出现「飞书CUI会话」分区。
 
@@ -169,8 +180,9 @@ dsh plugin --profile web add link:/Users/vsai/IdeaProjects/dsh-feishu-cui
 
 ```
 dsh-feishu-cui/
-├── package.json        两条脚本：check（对每个模块 node --check）、test（跑 test/ 下的回归用例）
+├── package.json        三条脚本：check（对每个模块 node --check）、test（回归用例）、prepublishOnly（发布前跑前两条）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
+├── ci/                 1 个文件    45 行   把仓库同步到 GitHub 的脚本（codeup 流水线里调它）
 ├── test/               21 个文件  2119 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
 └── lib/
     ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
