@@ -5,7 +5,7 @@ import { cardText, createCheck, createLogger, createPush, installSettings, libUr
 const { createSessionRenameHandler } = await import(libUrl('handler/feishu/session-rename.js'));
 const { createSessionCatalog } = await import(libUrl('infra/host/session.js'));
 const { readMenuCard } = await import(libUrl('cache/pending-cards.js'));
-const { NO_CURRENT_SESSION_TEXT, SESSION_RENAMED_TEXT, SESSION_RENAME_CANCELLED_TEXT, SESSION_RENAME_FAILED_TEXT, SESSION_RENAME_STALE_TEXT } = await import(libUrl('common/copy.js'));
+const { INPUT_CARD_STALE_TEXT, NO_CURRENT_SESSION_TEXT, SESSION_RENAMED_TEXT, SESSION_RENAME_CANCELLED_TEXT, SESSION_RENAME_FAILED_TEXT } = await import(libUrl('common/copy.js'));
 
 const check = createCheck();
 const { logger, lines } = createLogger();
@@ -59,7 +59,7 @@ check.eq('提交完这张卡就不在册了', readMenuCard().messageId, '');
 
 calls.length = 0;
 const stale = await handler.handleSessionRenameCard(cardEvent({ messageId: 'm-old' }));
-check.eq('不在册的卡片：不提交、回失效那句', [calls.length, cardText(responseCard(stale))], [0, SESSION_RENAME_STALE_TEXT]);
+check.eq('不在册的卡片：不提交、回失效那句', [calls.length, cardText(responseCard(stale))], [0, INPUT_CARD_STALE_TEXT]);
 
 await handler.pushSessionRename({ operatorId: 'u1' });
 const cancelled = await handler.handleSessionRenameCard(cardEvent({ content: { value: { tag: 'session-rename', btn: 'cancel' } } }));

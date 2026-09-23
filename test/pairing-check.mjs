@@ -1,11 +1,11 @@
-/** 配对：发码、已绑定、填对、填错、没有在册的码、取消。 */
+/** 配对：发码、已绑定、填对、填错、没有在册的码、失效卡、取消。 */
 
 import { cardText, createCheck, createPush, installSettings, libUrl, responseCard } from './harness.mjs';
 
 const { createPairingHandler } = await import(libUrl('handler/feishu/pairing.js'));
 const { clearPairingCode, readPairingCode, setPairingCode } = await import(libUrl('cache/pairing.js'));
 const { readMenuCard } = await import(libUrl('cache/pending-cards.js'));
-const { PAIRING_ALREADY_BOUND_TEXT, PAIRING_CANCELLED_TEXT, PAIRING_CODE_EXPIRED_TEXT, PAIRING_CODE_WRONG_TEXT, PAIRING_SUCCESS_TEXT } = await import(libUrl('common/copy.js'));
+const { INPUT_CARD_STALE_TEXT, PAIRING_ALREADY_BOUND_TEXT, PAIRING_CANCELLED_TEXT, PAIRING_CODE_EXPIRED_TEXT, PAIRING_CODE_WRONG_TEXT, PAIRING_SUCCESS_TEXT } = await import(libUrl('common/copy.js'));
 
 const check = createCheck();
 const settings = await installSettings({ sessionId: 's1', userId: '' });
@@ -26,6 +26,12 @@ check.eq('点菜单发出一张输入框卡片', [sent.length, sent[0].target.op
 check.ok('卡片类型是 pairing', JSON.stringify(sent[0].card).includes('"pairing"'));
 check.eq('生成了 8 位配对码', issued.length, 8);
 check.ok('配对码只用不会看错的字符', /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(issued));
+
+const stale = await handler.verifyPairingCode(cardEvent({
+  messageId: 'm-old',
+  content: { value: { tag: 'pairing', btn: 'confirm' }, formValue: { input: issued } },
+}));
+check.eq('不在册的卡片：不配对、回失效那句', [cardText(responseCard(stale)), settings.read().userId, readPairingCode()], [INPUT_CARD_STALE_TEXT, '', issued]);
 
 const success = await handler.verifyPairingCode(cardEvent({
   content: { value: { tag: 'pairing', btn: 'confirm' }, formValue: { input: ` ${issued.toLowerCase()} ` } },
@@ -53,6 +59,7 @@ const expired = await handler.verifyPairingCode(cardEvent({
 }));
 check.eq('没有在册的码（过期 / 用过）：让人重新申请', cardText(responseCard(expired)), PAIRING_CODE_EXPIRED_TEXT);
 
+await handler.pushPairingCode({ operatorId: 'u1' });
 setPairingCode('ABCD2345');
 const cancelled = await handler.verifyPairingCode(cardEvent({ content: { value: { tag: 'pairing', btn: 'cancel' } } }));
 check.eq('点取消：回取消那句', cardText(responseCard(cancelled)), PAIRING_CANCELLED_TEXT);
