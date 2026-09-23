@@ -191,7 +191,7 @@ dsh-feishu-cui/
 - **`infra/`**：跟外面的接口。`feishu/push.js` 发出站（发卡 / 换卡，失败重试）；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
 - **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
-- **`common/`**：各层共用的形状、常量与文案——CUI 事件（`cui-event-schema.js`）、飞书事件名（`events/feishu-event.js`）、凭据引用名（`credential-refs.js`）、给人看的文案总表（`copy.js`）。
+- **`common/`**：各层共用的形状、常量与文案——CUI 事件（`cui-event-schema.js`）、飞书事件名（`feishu-event.js`）、凭据引用名（`credential-refs.js`）、给人看的文案总表（`copy.js`）。
 - **`settings/`**：设置页。三条回环路由（`state` / `credentials` / `user/unbind`，只判回环和 JSON，不做身份校验）+ 浏览器半边。
 
 依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`、`common/`（文案在 `common/copy.js`），`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
