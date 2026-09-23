@@ -75,6 +75,7 @@ dsh plugin --profile web add link:/Users/vsai/IdeaProjects/dsh-feishu-cui
 | 申请配对 | `pairing` | 发一张输入框卡片，让你填配对码（见下一节） |
 | 工作区列表 | `workspaces` | 发「选择工作区」卡 |
 | 会话列表 | `sessions` | 发「选择会话」卡（底部多一个「新建」） |
+| 会话重命名 | `session-rename` | 发一张输入框卡片，填新名字（改的是当前会话） |
 | 模型 | `model` | 发「模型」卡 |
 | 推理深度 | `effort` | 发「推理深度」卡 |
 | 权限 | `permission` | 发「权限」卡 |
@@ -114,6 +115,7 @@ dsh plugin --profile web add link:/Users/vsai/IdeaProjects/dsh-feishu-cui
   还没选会话时回一句「还没有当前会话」；不是文本的消息回一句「只支持文本消息」（**图片 / 附件永不支持**）。
   投喂走宿主的会话控制器（`mode: 'queue'`），不是自己往会话日志里塞事件——模型可用性、会话是否还在这些校验都交给宿主。
 - **会话列表**里只列**当前工作区**的会话，摘要写「本工作区有 N 个会话」；一次都没跑过的空会话（没标题那种）不列。底部「新建」会在当前工作区里开一个新会话并切过去。
+- **会话重命名**改的是**当前会话**：点菜单发一张输入框卡片，填新名字、点「确定」；名字由宿主归一化（去掉控制字符、空白压成一个、超长按字节截断），卡片换成「当前会话已改名为【X】」，宿主要没收下就回一句「会话改名失败」。
 - **有活没干完时不让换会话、换工作区**：还有回答卡在册（排队中 / 处理中 / 正在停止）时，那两张卡的「确定」「新建」会被挡下来，回一句「有正在进行的任务，无法切换会话 / 工作区」。
 
 ### 主动通知
@@ -169,13 +171,13 @@ dsh-feishu-cui/
 ├── package.json        一条 check 脚本（对每个模块 node --check）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
 └── lib/
-    ├── index.js              1 个文件   136 行   装配：造对象、接线、生命周期
+    ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
     ├── notices.js            1 个文件    73 行   给绑定的人发卡：连上通告、解绑
     ├── cache/                6 个文件   223 行   需要跨文件读写的运行期状态
-    ├── common/               4 个文件   399 行   文案总表、飞书事件、CUI 事件、凭据引用名
-    ├── driving/              6 个文件   555 行   判定与分派（飞书那头 / 宿主那头）
-    ├── handler/             16 个文件  2147 行   干活：菜单、卡片、回答、反问、审批、通知
-    ├── infra/               11 个文件  1031 行   跟外面打交道：飞书出站、宿主服务、插件配置
+    ├── common/               4 个文件   420 行   文案总表、飞书事件、CUI 事件、凭据引用名
+    ├── driving/              6 个文件   559 行   判定与分派（飞书那头 / 宿主那头）
+    ├── handler/             17 个文件  2250 行   干活：菜单、卡片、回答、反问、审批、通知
+    ├── infra/               11 个文件  1051 行   跟外面打交道：飞书出站、宿主服务、插件配置
     ├── settings/             4 个文件   673 行   设置页（三条回环路由 + 浏览器半边）
     ├── transport/            6 个文件   284 行   连接：飞书长连接 / REST，宿主事件订阅、waterfall
     └── ui/                   6 个文件   501 行   卡片长什么样（只出 JSON）
@@ -187,7 +189,7 @@ dsh-feishu-cui/
 - **`notices.js`**：给绑定的那个人发卡。连接状态变了发一张「dsh 已连接，当前会话为【…】」；解绑时把 user 清掉、在册的配对码一起作废，再给原 user 发一张「已解绑」。
 - **`transport/`**：门外那一段。`feishu/` 是飞书侧（`websocket-client.js` 长连接与心跳看门狗、`http-client.js` REST、`transport.js` 把两个客户端一起持有、换凭据时整组重建）；`host/` 是宿主侧（`session-events.js` 订 `session/event`、`agent-events.js` 订收件箱三条、`waterfall.js` 订要人答的两条 waterfall）。
 - **`driving/`**：判定和分派。`feishu/` 把飞书原始事件转成 CUI 事件（`receiver.js`）、判准入（`admission.js`：去重、迟到、鉴权、只认文本、有没有当前会话）、按事件分给处理函数（`router.js`）；`host/` 对宿主事件做同样三件事，`router.js` 只把要盯的那几种事件分给 `handler/host/`。
-- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（六个菜单各一张卡 + `option-card-flow.js` 那套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
+- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（七个菜单各一张卡 + `option-card-flow.js` 那套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `session-rename.js` 会话重命名 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
 - **`infra/`**：跟外面的接口。`feishu/push.js` 发出站（发卡 / 换卡，失败重试）；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
 - **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
@@ -210,7 +212,7 @@ dsh-feishu-cui/
 
 ### C. 菜单与五张选择卡
 
-菜单：`websocket-client.js`（`application.bot.menu_v6`）→ `driving/feishu/receiver.js`（`tag` = 飞书的 `event_key`）→ `admission.js`（配对放行，其余只给 owner）→ `router.js` → 六个 handler（`sessions` / `workspaces` / `model` / `effort` / `permission` / `balance`，外加 `pairing`）→ `ui/option-card.js` / `ui/text-card.js` → `push.sendCard`，消息 ID 记进 `cache/pending-cards.js`。
+菜单：`websocket-client.js`（`application.bot.menu_v6`）→ `driving/feishu/receiver.js`（`tag` = 飞书的 `event_key`）→ `admission.js`（配对放行，其余只给 owner）→ `router.js` → 七个 handler（`sessions` / `session-rename` / `workspaces` / `model` / `effort` / `permission` / `balance`，外加 `pairing`）→ `ui/option-card.js` / `ui/input-card.js` / `ui/text-card.js` → `push.sendCard`，消息 ID 记进 `cache/pending-cards.js`。
 
 卡片回调（`card.action.trigger`）→ `admission.admitCard`（是不是本人；换会话、换工作区那两个按钮还要看有没有活没干完）→ `router.js` → `handler/feishu/option-card-flow.js`（点一行只选中 → 重画；确定 → 交给各家的 `onConfirm`；取消 / 没选就确定 → 按取消）→ `infra/host/{session,workspace,models,permissions}.js` → 宿主。设置卡先回「已请求」，后台提交；宿主那边的事件回来 → `handler/host/settings-watch.js` 发「…已修改」。
 
