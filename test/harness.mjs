@@ -101,7 +101,7 @@ export function createPush() {
 /**
  * 造一份条目 config：三个字段都是带 `get()` 的引用，跟 Loader 给 volatile 字段的那种引用一样。
  *
- * `lib/infra/plugin/config.js` 的 `readConfigField` 认这种形状，所以插件写回设置之后再读 config
+ * `lib/infra/common/config-field.js` 的 `readConfigField` 认这种形状，所以插件写回设置之后再读 config
  * 拿到的是新值；换成一个死的普通对象，写回就读不到了。
  *
  * @param readStored 读当前存下来的那份设置：`() => ({ sessionId, userId, workspaceId })`
