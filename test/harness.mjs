@@ -125,6 +125,7 @@ function liveConfig(readStored) {
  */
 export async function installSettings(initial = {}) {
   const { setSettingsHandle } = await import(libUrl('cache/settings-handle.js'));
+  const { setCurrentSession } = await import(libUrl('cache/current-session.js'));
   let stored = { sessionId: '', userId: '', workspaceId: '', ...initial };
   setSettingsHandle({
     settings: {
@@ -134,10 +135,14 @@ export async function installSettings(initial = {}) {
     },
     config: liveConfig(() => stored),
   });
+  // 当前会话那份缓存由启动时的校验填；这里等价于「校验通过」，直接按初始值填上。
+  setCurrentSession(stored.sessionId);
   return {
     read: () => stored,
     set: (next) => {
       stored = { ...stored, ...next };
+      // 直接改这份内存设置绕过了 writeSettings，缓存得跟着走，不然插件还认旧的那条。
+      if ('sessionId' in next) setCurrentSession(stored.sessionId);
     },
   };
 }
@@ -298,6 +303,9 @@ export async function startPlugin({
 } = {}) {
   /** 内存里的设置。 */
   let stored = { sessionId, userId, workspaceId };
+
+  /** 当前会话缓存：插件启动时那次校验会按 `stored.sessionId` 填它，用例也可以直接改。 */
+  const { setCurrentSession } = await import(libUrl('cache/current-session.js'));
 
   /** 内存里的凭据。 */
   const credentialStore = new Map();
@@ -495,7 +503,14 @@ export async function startPlugin({
     calls,
     services,
     /** 直接读/改内存里的设置。 */
-    settings: { read: () => stored, set: (next) => { stored = { ...stored, ...next }; } },
+    settings: {
+      read: () => stored,
+      set: (next) => {
+        stored = { ...stored, ...next };
+        // 直接改这份内存设置绕过了 writeSettings，缓存得跟着走；这里等价于插件启动时那次校验的结果。
+        if ('sessionId' in next) setCurrentSession(stored.sessionId);
+      },
+    },
     /** 直接读内存里的凭据。 */
     credentials: () => Object.fromEntries(credentialStore),
     incoming,

@@ -12,7 +12,12 @@ const { SESSION_LIST_KEY } = await import(libUrl('handler/feishu/sessions.js'));
 const { readPairingCode } = await import(libUrl('cache/pairing.js'));
 
 const check = createCheck();
-const app = await startPlugin({ sessionId: 'sess-1', userId: '', sessionRecords: [] });
+// 启动时会校验「配置的当前会话在不在列表里」，不在就按「没有当前会话」处理；夹具里得让它在。
+const app = await startPlugin({
+  sessionId: 'sess-1',
+  userId: '',
+  sessionRecords: [sessionRecord({ id: 'sess-1', title: '会话一', turns: 3 })],
+});
 await tick(30);
 
 /** 最近一张发出去的卡片。 */
