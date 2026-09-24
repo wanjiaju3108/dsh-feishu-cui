@@ -1,6 +1,6 @@
 {
   "name": "dsh-feishu-cui",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "不用自己处理运维的远程 DSH：拿飞书私聊当操作界面（CUI），消息与卡片走飞书机器人长连接",
   "type": "module",
   "main": "lib/index.js",
