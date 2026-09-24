@@ -38,7 +38,10 @@ const catalog = {
   },
 };
 
-const handler = createSessionsHandler({ logger, push, catalog });
+/** 当前工作区：真实那份会校验它还在不在，这里直接用设置里那个值。 */
+const workspaces = { currentWorkspaceId: () => settings.read().workspaceId };
+
+const handler = createSessionsHandler({ logger, push, catalog, workspaces });
 
 /** 造一次卡片回调。 */
 const cardEvent = (over = {}) => ({
