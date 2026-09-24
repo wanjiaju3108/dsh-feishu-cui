@@ -57,6 +57,13 @@ dsh plugin --profile web add dsh-feishu-cui
 
 装完重启 `dsh web`。装在别的 profile 上就把 `--profile` 换成那个名字；本机改这个插件自己的代码时，用 `link:` 指到仓库目录也一样。
 
+> **DSH 版本**：当前 `0.2.x` 需要 DSH `0.1.7-rc.1` 及以上——设置走的是 0.1.7 起的插件条目 config（带 `volatile` 那几个字段）。
+> 还在 DSH 0.1.5 上的，装最后一个支持它的版本：
+>
+> ```sh
+> dsh plugin --profile web add dsh-feishu-cui@0.1.0
+> ```
+
 > **装的时候如果收尾报 `ERR_PNPM_IGNORED_BUILDS: protobufjs`，插件其实没装上。**
 > `@larksuiteoapi/node-sdk` 的依赖里有 `protobufjs`，它带 postinstall 脚本，pnpm 默认不跑；dsh 把 pnpm 的非零退出当成整体失败，于是没把插件登记进 profile。先放行再装一次：
 >
