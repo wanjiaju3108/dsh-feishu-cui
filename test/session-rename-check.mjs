@@ -1,15 +1,15 @@
-/** 会话重命名：菜单发输入框卡片、提交改名、取消、失效卡、宿主拒了、没有当前会话。 */
+/** 会话重命名：菜单发输入框卡片、提交改名（先回已请求、结果补回卡上）、取消、失效卡、宿主拒了、没有当前会话。 */
 
-import { cardText, createCheck, createLogger, createPush, installSettings, libUrl, responseCard } from './harness.mjs';
+import { cardText, createCheck, createLogger, createPush, installSettings, libUrl, responseCard, tick } from './harness.mjs';
 
 const { createSessionRenameHandler } = await import(libUrl('handler/feishu/session-rename.js'));
 const { createSessionCatalog } = await import(libUrl('infra/host/session.js'));
 const { readMenuCard } = await import(libUrl('cache/pending-cards.js'));
-const { INPUT_CARD_STALE_TEXT, NO_CURRENT_SESSION_TEXT, SESSION_RENAMED_TEXT, SESSION_RENAME_CANCELLED_TEXT, SESSION_RENAME_FAILED_TEXT } = await import(libUrl('common/copy.js'));
+const { INPUT_CARD_STALE_TEXT, NO_CURRENT_SESSION_TEXT, SESSION_RENAME_CANCELLED_TEXT, SESSION_RENAME_FAILED_TEXT, SESSION_RENAME_REQUESTED_TEXT } = await import(libUrl('common/copy.js'));
 
 const check = createCheck();
 const { logger, lines } = createLogger();
-const { push, sent } = createPush();
+const { push, sent, patched } = createPush();
 const settings = await installSettings({ sessionId: 's1', userId: 'u1' });
 
 /** 假会话控制器：记下每次改名请求，按 `mode` 决定成功还是抛错。 */
@@ -52,10 +52,12 @@ check.ok('卡片类型是 session-rename', JSON.stringify(sent[0].card).includes
 check.eq('卡片记进在册', readMenuCard().messageId, 'm1');
 
 const ok = await handler.handleSessionRenameCard(cardEvent({ content: { value: { tag: 'session-rename', btn: 'confirm' }, formValue: { input: '  新名字  ' } } }));
-check.eq('提交时把表单里的原文交给宿主', calls, [{ sessionId: 's1', title: '  新名字  ' }]);
-check.eq('回的是宿主收下后的名字', cardText(responseCard(ok)), SESSION_RENAMED_TEXT('新名字'));
-check.ok('改成了留下 info 日志', lines.info.some((line) => line.includes('已改名为「新名字」')));
+check.ok('确定：先把「已请求」那句换上去', cardText(responseCard(ok)).includes('已请求'));
 check.eq('提交完这张卡就不在册了', readMenuCard().messageId, '');
+await tick();
+check.eq('提交时把表单里的原文交给宿主', calls, [{ sessionId: 's1', title: '  新名字  ' }]);
+check.eq('提交成功就不再动那张卡', patched.length, 0);
+check.ok('改成了留下 info 日志', lines.info.some((line) => line.includes('已改名为「新名字」')));
 
 calls.length = 0;
 const stale = await handler.handleSessionRenameCard(cardEvent({ messageId: 'm-old' }));
@@ -69,9 +71,14 @@ check.eq('点取消之后也不在册了', readMenuCard().messageId, '');
 await handler.pushSessionRename({ operatorId: 'u1' });
 mode = 'throw';
 calls.length = 0;
+sent.length = 0;
 const failed = await handler.handleSessionRenameCard(cardEvent({ content: { value: { tag: 'session-rename', btn: 'confirm' }, formValue: { input: '   ' } } }));
-check.eq('宿主拒了：回失败那句', cardText(responseCard(failed)), SESSION_RENAME_FAILED_TEXT);
-check.ok('宿主原话不上屏', !cardText(responseCard(failed)).includes('visible characters'));
+check.ok('宿主拒了：也是先回「已请求」', cardText(responseCard(failed)).includes('已请求'));
+check.eq('宿主拒了：确定那张卡不再补写', patched.length, 0);
+await tick();
+check.eq('宿主拒了：失败那句另发一张卡', cardText(sent[sent.length - 1].card), SESSION_RENAME_FAILED_TEXT);
+check.eq('失败卡也发给点卡的人', sent[sent.length - 1].target, { openId: 'u1' });
+check.ok('宿主原话不上屏', !cardText(sent[sent.length - 1].card).includes('visible characters'));
 check.ok('宿主原话进日志', lines.warn.some((line) => line.includes('visible characters')));
 mode = 'ok';
 

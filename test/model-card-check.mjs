@@ -74,10 +74,13 @@ current = { provider: 'deepseek', model: 'chat' };
 await handler.pushModelCard({ operatorId: 'u1' });
 selectResult = { ok: false, unsupported: true };
 selected.length = 0;
-patched.length = 0;
-await handler.handleModelCard(cardEvent({ content: { value: { tag: 'model', btn: 'confirm', value: 'deepseek/chat' } } }));
+sent.length = 0;
+const unsupported = await handler.handleModelCard(cardEvent({ content: { value: { tag: 'model', btn: 'confirm', value: 'deepseek/chat' } } }));
+check.ok('宿主不支持这个组合：确定那张卡上还是「已请求」', cardText(responseCard(unsupported)).includes('已请求'));
+check.eq('宿主不支持这个组合：确定那张卡不再补写', patched.length, 0);
 await tick();
-check.eq('宿主不支持这个组合：把失败原因补到卡上', cardText(patched[patched.length - 1].card), MODEL_SELECT_UNSUPPORTED_TEXT);
+check.eq('宿主不支持这个组合：失败原因另发一张卡', cardText(sent[sent.length - 1].card), MODEL_SELECT_UNSUPPORTED_TEXT);
+check.eq('失败卡也发给点卡的人', sent[sent.length - 1].target, { openId: 'u1' });
 selectResult = { ok: true };
 
 await handler.pushModelCard({ operatorId: 'u1' });

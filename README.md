@@ -25,7 +25,7 @@
 - 私聊发一句话 → 排进「当前会话」的队列（不打断正在跑的那一轮），回答**回到那条消息上**：卡片跟着状态走——被取走后是「处理中」（带「停止」按钮），刚进队列还没被取走是「排队中」（带「撤回」按钮），之后逐段把正文接上去，跑完收尾成「已完成」/「已停止」/「处理失败」。正文超过卡片体积上限（30KB）就换成「任务失败」+ 一句「去网页端看」。
 - 菜单八项：申请配对、工作区列表、会话列表（含「新建」）、会话重命名、模型、推理深度、权限、余额。
 - agent 反问（`ask_user_question`）与工具审批（工具要授权）都在飞书弹卡：**谁触发的谁答**。
-- 别处（网页端 / CLI）改了当前会话的模型或权限 → 主动私聊通知 owner 一张「模型已修改」/「权限已修改」卡。
+- 别处（网页端 / CLI）改了当前会话的模型 / 权限 / 会话名 → 主动私聊通知 owner 一张「模型已修改」/「权限已修改」/「会话名已修改」卡。
 - 长连接自愈：休眠 / 半开连接有存活看门狗（见[长连接的存活与恢复](#长连接的存活与恢复)）。
 
 **不做什么（能力边界，详细取舍见[边界与约定](#边界与约定)）**
@@ -127,14 +127,15 @@ dsh plugin --profile web add dsh-feishu-cui
   还没选会话时回一句「还没有当前会话」；不是文本的消息回一句「只支持文本消息」（**图片 / 附件永不支持**）。
   投喂走宿主的会话控制器（`mode: 'queue'`），不是自己往会话日志里塞事件——模型可用性、会话是否还在这些校验都交给宿主。
 - **会话列表**里只列**当前工作区**的会话，摘要写「本工作区有 N 个会话」；一次都没跑过的空会话（没标题那种）不列。底部「新建」会在当前工作区里开一个新会话并切过去。
-- **会话重命名**改的是**当前会话**：点菜单发一张输入框卡片，填新名字、点「确定」；名字由宿主归一化（去掉转义序列与控制字符、空白压成一个、超长按字节截断），卡片换成「当前会话已改名为【X】」，宿主要是没收下就回一句「会话改名失败」。
+- **会话重命名**改的是**当前会话**：点菜单发一张输入框卡片，填新名字、点「确定」；名字由宿主归一化（去掉转义序列与控制字符、空白压成一个、超长按字节截断），卡片先换成「已请求：会话改名为【X】」，宿主要是没收下就另发一张卡写「会话改名失败」；真改成了由宿主那条事件发一张「会话名已修改」。
 - **有活没干完时不让换会话、换工作区**：还有回答卡在册（排队中 / 处理中 / 正在停止）时，那两张卡的「确定」「新建」会被挡下来，回一句「有正在进行的任务，无法切换会话 / 工作区」。
 
 ### 主动通知
 
-- 当前会话的**模型**（连同推理深度）或**权限**被改了，就往飞书发一张卡：标题「模型已修改」/「权限已修改」，正文「模型改成【X】」「推理深度改成【X】」「权限改成【X】」。
-- **不管是谁改的**：宿主那两条事件（`model/selection`、`permission/preset`）里没有「谁改的」这个信息，所以网页端改、CLI 改、以及**你自己从飞书那几张设置卡改**，都会收到这张卡。
+- 当前会话的**模型**（连同推理深度）、**权限**或**会话名**被改了，就往飞书发一张卡：标题「模型已修改」/「权限已修改」/「会话名已修改」，正文「模型改成【X】」「推理深度改成【X】」「权限改成【X】」「会话名改成【X】」。
+- **不管是谁改的**：宿主那三条事件（`model/selection`、`permission/preset`、`session/title`）里没有「谁改的」这个信息，所以网页端改、CLI 改、以及**你自己从飞书那几张设置卡改**，都会收到这张卡。
   从飞书改的那一次，它正好就是这次请求的回应：设置卡先变成「已请求：…」，紧接着这张「…已修改」的新卡到。
+- 会话名那条事件要挑一下：自动起的标题（模型生成的、兜底的）也走它，只有 `source.kind` 是 `user`（人手动改名）才通知。
 - 一次权限变更只发一张：预设名变了才通知，跟着变的沙箱模式与审批策略不单独报（它们就是预设的内容）。
 
 ### 长连接的存活与恢复
@@ -158,7 +159,7 @@ dsh plugin --profile web add dsh-feishu-cui
 | 回「还没有当前会话」 | 先去菜单里选一个会话 |
 | 回「只支持文本消息」 | 发的是图片 / 文件 / 附件（永不支持） |
 | 卡片点了只回「这张卡片已失效…」 | 这张卡已经被新卡顶掉，或者已经处理过了 |
-| 设置卡点完只显示「已请求：…」 | 这是设计：请求交出去了，成不成由宿主那边的事件回一张「…已修改」 |
+| 设置卡点完只留「已请求：…」 | 这是设计：请求交出去了，结果一律另发一张卡——成功是宿主那条事件发的「…已修改」，失败是「…失败」那张 |
 | 反问卡没弹到飞书 | 这一轮不是飞书发起的（让给网页端了）；或者题目是多选 / 没选项 |
 
 ## 边界与约定
@@ -166,7 +167,7 @@ dsh plugin --profile web add dsh-feishu-cui
 - **谁触发的谁答**：只有**飞书这边发起**、而且正在跑的那一轮，反问卡和审批卡才会弹到飞书；网页端发起的轮次一律让给网页端的 UI（不然人坐在网页那边会干等）。判据是运行期那个「正在跑的那一轮是哪条飞书消息」的槽。
 - **子代理问不到人**：两条路都被宿主挡着——反问那边，被别人拥有的子代理一问就抛 `DELEGATED_CALLER`；审批那边，子会话的审批策略在派发时被钉成 `never`，需要审批的操作当场被拒。所以子代理的反问 / 审批根本走不到飞书。
 - **会话级设置，下一次请求生效**：模型、推理深度、权限都是写进当前会话的，不影响别的会话；改完从下一次提问开始按新的来。
-- **设置卡只说「已请求」**：点「确定」之后卡片先变「已请求：…」（校验过了、请求交出去了），后台才真正提交；提交失败会再补一刀，把那句话换成失败原因。成功就不再动它——结果由宿主那条事件通知（「…已修改」）来说。
+- **设置卡点完只留「已请求」**：模型、推理深度、权限、会话名这四张卡都一样——点「确定」之后卡片变「已请求：…」（校验过了、请求交出去了），后台才真正提交；**结果一律另发一张卡**：交成了由宿主那条事件发「…已修改」，没交成发一张写失败原因的卡。确定那张卡此后不再动，一直停在「已请求」。宿主那条会话名事件还带着自动起的标题（模型生成的和兜底的），这里只认人手动改名（`source.kind` 是 `user`）那一种，不然每开一个新会话都要通知一次。
 - **换会话 / 换工作区要有活没干完**：有回答卡在册时挡下来（见[日常用法](#日常用法)）。
 - **卡片体积**：一张卡上限 30KB，回答卡到顶就换成「任务失败」；选项卡、反问卡在发之前也量一次，装不下的让给网页端。
 - **反问只接单选且有选项**：多选题、没有选项的题，飞书这边先回一句「这题飞书答不了（没有选项或者是多选题），去网页端答吧」，再把请求让给网页端。
@@ -182,14 +183,14 @@ dsh plugin --profile web add dsh-feishu-cui
 dsh-feishu-cui/
 ├── package.json        三条脚本：check（对每个模块 node --check）、test（回归用例）、prepublishOnly（发布前跑前两条）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
-├── test/               21 个文件  2119 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
+├── test/               22 个文件  2239 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
 └── lib/
     ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
     ├── notices.js            1 个文件    73 行   给绑定的人发卡：连上通告、解绑
     ├── cache/                6 个文件   223 行   需要跨文件读写的运行期状态
     ├── common/               4 个文件   419 行   文案总表、飞书事件、CUI 事件、凭据引用名
     ├── driving/              6 个文件   559 行   判定与分派（飞书那头 / 宿主那头）
-    ├── handler/             18 个文件  2294 行   干活：菜单、卡片、回答、反问、审批、通知
+    ├── handler/             19 个文件  2333 行   干活：菜单、卡片、回答、反问、审批、通知
     ├── infra/               11 个文件  1051 行   跟外面打交道：飞书出站、宿主服务、插件配置
     ├── settings/             4 个文件   673 行   设置页（三条回环路由 + 浏览器半边）
     ├── transport/            6 个文件   284 行   连接：飞书长连接 / REST，宿主事件订阅、waterfall
@@ -202,7 +203,7 @@ dsh-feishu-cui/
 - **`notices.js`**：给绑定的那个人发卡。连接状态变了发一张「dsh 已连接，当前会话为【…】」；解绑时把 user 清掉、在册的配对码一起作废，再给原 user 发一张「已解绑」。
 - **`transport/`**：门外那一段。`feishu/` 是飞书侧（`websocket-client.js` 长连接与心跳看门狗、`http-client.js` REST、`transport.js` 把两个客户端一起持有、换凭据时整组重建）；`host/` 是宿主侧（`session-events.js` 订 `session/event`、`agent-events.js` 订收件箱三条、`waterfall.js` 订要人答的两条 waterfall）。
 - **`driving/`**：判定和分派。`feishu/` 把飞书原始事件转成 CUI 事件（`receiver.js`）、判准入（`admission.js`：去重、迟到、鉴权、只认文本、有没有当前会话）、按事件分给处理函数（`router.js`）；`host/` 对宿主事件做同样三件事，`router.js` 只把要盯的那几种事件分给 `handler/host/`。
-- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（七个菜单各一张卡 + `option-card-flow.js`、`input-card-flow.js` 两套共用骨架 + `message.js` 投喂 + `pairing.js` 配对 + `session-rename.js` 会话重命名 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
+- **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（七个菜单各一张卡 + `option-card-flow.js`、`input-card-flow.js` 两套共用骨架 + `deferred-submit.js` 两套共用的后台提交 + `message.js` 投喂 + `pairing.js` 配对 + `session-rename.js` 会话重命名 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
 - **`infra/`**：跟外面的接口。`feishu/push.js` 发出站（发卡 / 换卡，失败重试）；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
 - **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
@@ -211,7 +212,7 @@ dsh-feishu-cui/
 
 依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`、`common/`（文案在 `common/copy.js`），`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
 
-改完跑两条：`npm run check`（每个模块过一遍 `node --check`）、`npm test`（跑 `test/` 下的 17 个用例，全部不联网）。用例分两档：`*-check.mjs` 里的单元那份只造要测的那几个对象（假出站、假会话目录）；端到端那份（`connection` / `no-credentials` / `inbound` / `answer-card` / `waterfall` / `settings-routes`）用 `harness.mjs` 的 `startPlugin()` 真调一遍 `apply()`，把上下文、宿主服务和飞书 SDK 都换成假的（`fake-lark.mjs` 配 `lark-hooks.mjs` 顶掉那个 SDK）。
+改完跑两条：`npm run check`（每个模块过一遍 `node --check`）、`npm test`（跑 `test/` 下的 18 个用例，全部不联网）。用例分两档：`*-check.mjs` 里的单元那份只造要测的那几个对象（假出站、假会话目录）；端到端那份（`connection` / `no-credentials` / `inbound` / `answer-card` / `waterfall` / `settings-routes`）用 `harness.mjs` 的 `startPlugin()` 真调一遍 `apply()`，把上下文、宿主服务和飞书 SDK 都换成假的（`fake-lark.mjs` 配 `lark-hooks.mjs` 顶掉那个 SDK）。
 
 ## 用例脉络
 
@@ -229,7 +230,7 @@ dsh-feishu-cui/
 
 菜单：`websocket-client.js`（`application.bot.menu_v6`）→ `driving/feishu/receiver.js`（`tag` = 飞书的 `event_key`）→ `admission.js`（配对放行，其余只给 owner）→ `router.js` → 七个 handler（`sessions` / `session-rename` / `workspaces` / `model` / `effort` / `permission` / `balance`，外加 `pairing`）→ `ui/option-card.js` / `ui/input-card.js` / `ui/text-card.js` → `push.sendCard`，消息 ID 记进 `cache/pending-cards.js`。
 
-卡片回调（`card.action.trigger`）→ `admission.admitCard`（是不是本人；换会话、换工作区那两个按钮还要看有没有活没干完）→ `router.js` → `handler/feishu/option-card-flow.js`（点一行只选中 → 重画；确定 → 交给各家的 `onConfirm`；取消 / 没选就确定 → 按取消）→ `infra/host/{session,workspace,models,permissions}.js` → 宿主。设置卡先回「已请求」，后台提交；宿主那边的事件回来 → `handler/host/settings-watch.js` 发「…已修改」。
+卡片回调（`card.action.trigger`）→ `admission.admitCard`（是不是本人；换会话、换工作区那两个按钮还要看有没有活没干完）→ `router.js` → `handler/feishu/option-card-flow.js`（点一行只选中 → 重画；确定 → 交给各家的 `onConfirm`；取消 / 没选就确定 → 按取消）或 `input-card-flow.js`（重命名那张卡：确定 → 交给 `onSubmit`）→ `infra/host/{session,workspace,models,permissions}.js` → 宿主。四张设置卡都先回「已请求」，后台提交（`handler/feishu/deferred-submit.js`）——交成了由宿主那边的事件发「…已修改」（`handler/host/settings-watch.js`），没交成由这里另发一张写失败原因的卡。
 
 ### D. 要人来答的两条口
 
@@ -251,7 +252,7 @@ dsh-feishu-cui/
 
 ### G. 主动通知
 
-`session/event` 里的 `model/selection` / `permission/preset` → `driving/host/receiver.js`（把事件载荷一起带出来）→ `driving/host/router.js` → `handler/host/settings-watch.js`（拼标题与正文）→ `ui/text-card.js`（带标题栏）→ `push.sendCard`。
+`session/event` 里的 `model/selection` / `permission/preset` / `session/title` → `driving/host/receiver.js`（把事件载荷一起带出来）→ `driving/host/router.js` → `handler/host/settings-watch.js`（拼标题与正文；会话名那条只认人手动改名）→ `ui/text-card.js`（带标题栏）→ `push.sendCard`。
 
 ## 看日志
 
