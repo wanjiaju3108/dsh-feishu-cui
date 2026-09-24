@@ -2,7 +2,7 @@
 
 import { callRoute, cardText, createCheck, libUrl, registry, resetCalls, sentCards, startPlugin, tick } from './harness.mjs';
 
-const { CREDENTIALS_ROUTE, SETTINGS_BASE_PATH, STATE_ROUTE, UNBIND_USER_ROUTE } = await import(libUrl('settings/routes.js'));
+const { CREDENTIALS_ROUTE, SETTINGS_BASE_PATH, SLEEP_GUARD_ROUTE, STATE_ROUTE, UNBIND_USER_ROUTE } = await import(libUrl('settings/routes.js'));
 const { UNBOUND_TEXT, UNBOUND_TITLE } = await import(libUrl('common/copy.js'));
 const { setPairingCode } = await import(libUrl('cache/pairing.js'));
 
@@ -12,8 +12,8 @@ await tick(30);
 
 const route = (path) => app.routes.find((item) => item.path === path);
 
-check.eq('挂的是三条精确路由', app.routes.map((item) => [item.kind, item.path]), [
-  ['exact', STATE_ROUTE], ['exact', CREDENTIALS_ROUTE], ['exact', UNBIND_USER_ROUTE],
+check.eq('挂的是四条精确路由', app.routes.map((item) => [item.kind, item.path]), [
+  ['exact', STATE_ROUTE], ['exact', CREDENTIALS_ROUTE], ['exact', UNBIND_USER_ROUTE], ['exact', SLEEP_GUARD_ROUTE],
 ]);
 check.ok('路径都挂在插件自己的前缀下', app.routes.every((item) => item.path.startsWith(SETTINGS_BASE_PATH)));
 
@@ -21,7 +21,8 @@ const snapshot = await callRoute(route(STATE_ROUTE), { method: 'GET' });
 check.eq('读状态：200', snapshot.status, 200);
 check.eq('读状态：回的是 JSON', snapshot.headers['content-type'], 'application/json; charset=utf-8');
 check.eq('快照里的字段', Object.keys(snapshot.json).sort(), [
-  'appIdConfigured', 'appIdWritable', 'appSecretConfigured', 'appSecretWritable', 'connected', 'pairingCode', 'userId',
+  'appIdConfigured', 'appIdWritable', 'appSecretConfigured', 'appSecretWritable', 'connected', 'pairingCode',
+  'sleepGuard', 'userId',
 ].sort());
 check.eq('没有在册的配对码时回 null', snapshot.json.pairingCode, null);
 

@@ -4,7 +4,7 @@ import { callRoute, cardText, createCheck, libUrl, registry, resetCalls, sentCar
 
 const { SUBSCRIBED_EVENT_TYPES } = await import(libUrl('common/feishu-event.js'));
 const { ANNOUNCE_SESSION_TEXT } = await import(libUrl('common/copy.js'));
-const { CREDENTIALS_ROUTE, STATE_ROUTE, UNBIND_USER_ROUTE } = await import(libUrl('settings/routes.js'));
+const { CREDENTIALS_ROUTE, SLEEP_GUARD_ROUTE, STATE_ROUTE, UNBIND_USER_ROUTE } = await import(libUrl('settings/routes.js'));
 
 const check = createCheck();
 const app = await startPlugin({ sessionId: 'sess-1', userId: 'ou_boss' });
@@ -21,7 +21,7 @@ check.eq('喂给 SDK 的凭据与域名', [
 check.eq('自动重连开着', registry.wsOptions.autoReconnect, true);
 check.eq('看门狗交给 SDK：ping 超时 15 秒', registry.wsOptions.wsConfig, { pingTimeout: 15 });
 check.eq('只订阅那三个事件', [...registry.dispatcher.handlers.keys()].sort(), [...SUBSCRIBED_EVENT_TYPES].sort());
-check.eq('三条设置页路由都挂上了', app.routes.map((route) => route.path).sort(), [CREDENTIALS_ROUTE, STATE_ROUTE, UNBIND_USER_ROUTE].sort());
+check.eq('四条设置页路由都挂上了', app.routes.map((route) => route.path).sort(), [CREDENTIALS_ROUTE, SLEEP_GUARD_ROUTE, STATE_ROUTE, UNBIND_USER_ROUTE].sort());
 
 const announced = registry.calls.filter((call) => call.kind === 'message.create');
 check.eq('连上之后给绑定的人发一张通告卡', [announced.length, announced[0].receiveId, announced[0].receiveIdType], [1, 'ou_boss', 'open_id']);

@@ -104,7 +104,7 @@ export function createPush() {
  * `lib/infra/common/config-field.js` 的 `readConfigField` 认这种形状，所以插件写回设置之后再读 config
  * 拿到的是新值；换成一个死的普通对象，写回就读不到了。
  *
- * @param readStored 读当前存下来的那份设置：`() => ({ sessionId, userId, workspaceId })`
+ * @param readStored 读当前存下来的那份设置：`() => ({ sessionId, userId, workspaceId, sleepGuardEnabled })`
  * @returns config 对象
  */
 function liveConfig(readStored) {
@@ -112,6 +112,7 @@ function liveConfig(readStored) {
     sessionId: { get: () => readStored().sessionId },
     userId: { get: () => readStored().userId },
     workspaceId: { get: () => readStored().workspaceId },
+    sleepGuardEnabled: { get: () => readStored().sleepGuardEnabled },
   };
 }
 
@@ -126,7 +127,7 @@ function liveConfig(readStored) {
 export async function installSettings(initial = {}) {
   const { setSettingsHandle } = await import(libUrl('cache/settings-handle.js'));
   const { setCurrentSession } = await import(libUrl('cache/current-session.js'));
-  let stored = { sessionId: '', userId: '', workspaceId: '', ...initial };
+  let stored = { sessionId: '', userId: '', workspaceId: '', sleepGuardEnabled: true, ...initial };
   setSettingsHandle({
     settings: {
       update: async (namespace, next) => {
@@ -302,7 +303,7 @@ export async function startPlugin({
   controller: overrides = {},
 } = {}) {
   /** 内存里的设置。 */
-  let stored = { sessionId, userId, workspaceId };
+  let stored = { sessionId, userId, workspaceId, sleepGuardEnabled: true };
 
   /** 当前会话缓存：插件启动时那次校验会按 `stored.sessionId` 填它，用例也可以直接改。 */
   const { setCurrentSession } = await import(libUrl('cache/current-session.js'));
