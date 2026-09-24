@@ -99,19 +99,40 @@ export function createPush() {
 }
 
 /**
+ * 造一份条目 config：三个字段都是带 `get()` 的引用，跟 Loader 给 volatile 字段的那种引用一样。
+ *
+ * `lib/infra/plugin/config.js` 的 `readConfigField` 认这种形状，所以插件写回设置之后再读 config
+ * 拿到的是新值；换成一个死的普通对象，写回就读不到了。
+ *
+ * @param readStored 读当前存下来的那份设置：`() => ({ sessionId, userId, workspaceId })`
+ * @returns config 对象
+ */
+function liveConfig(readStored) {
+  return {
+    sessionId: { get: () => readStored().sessionId },
+    userId: { get: () => readStored().userId },
+    workspaceId: { get: () => readStored().workspaceId },
+  };
+}
+
+/**
  * 装一份只在内存里的设置，返回读它、改它的入口。
+ *
+ * 直接把 `cache/settings-handle.js` 的句柄塞上，等价于插件启动时 `registerSettings` 做完的那件事。
  *
  * @param initial 初始值（`sessionId` / `userId` / `workspaceId`，缺的补空串）
  * @returns `{ read, set }`
  */
 export async function installSettings(initial = {}) {
-  const { setSettingsScope } = await import(libUrl('cache/settings-scope.js'));
+  const { setSettingsHandle } = await import(libUrl('cache/settings-handle.js'));
   let stored = { sessionId: '', userId: '', workspaceId: '', ...initial };
-  setSettingsScope({
-    get: () => stored,
-    replace: async (next) => {
-      stored = next;
+  setSettingsHandle({
+    settings: {
+      update: async (namespace, next) => {
+        stored = { ...next };
+      },
     },
+    config: liveConfig(() => stored),
   });
   return {
     read: () => stored,
@@ -275,11 +296,8 @@ export async function startPlugin({
   workspaces = [{ id: 'ws-1', title: '默认工作区', path: '/tmp/ws', sessionIds: [sessionId] }],
   controller: overrides = {},
 } = {}) {
-  const { setSettingsScope } = await import(libUrl('cache/settings-scope.js'));
-
   /** 内存里的设置。 */
   let stored = { sessionId, userId, workspaceId };
-  setSettingsScope({ get: () => stored, replace: async (next) => { stored = next; } });
 
   /** 内存里的凭据。 */
   const credentialStore = new Map();
@@ -346,10 +364,8 @@ export async function startPlugin({
       archivedSessionIds: () => [],
     },
     settings: {
-      register: () => ({
-        get: () => ({ ...stored }),
-        replace: async (next) => { stored = { ...next }; },
-      }),
+      configure: () => {},
+      update: async (namespace, next) => { stored = { ...next }; },
     },
     credentials: credentialsService,
     webServer: { register: (route) => { routes.push(route); return () => {}; } },
@@ -381,7 +397,7 @@ export async function startPlugin({
   };
 
   const plugin = await import(libUrl('index.js'));
-  await plugin.apply(ctx);
+  await plugin.apply(ctx, liveConfig(() => stored));
 
   /**
    * 收一条私聊消息。
