@@ -183,6 +183,7 @@ dsh plugin --profile web add dsh-feishu-cui
 dsh-feishu-cui/
 ├── package.json        三条脚本：check（对每个模块 node --check）、test（回归用例）、prepublishOnly（发布前跑前两条）
 ├── README.md           装 / 配 / 用法 / 通知 / 休眠 / 边界 / 结构 / 脉络 / 日志 / 术语
+├── CHANGELOG.md        每一版改了什么
 ├── test/               22 个文件  2239 行   回归用例：不联网；单元那份用假出站，端到端那份真起插件（假 SDK + 假宿主）
 └── lib/
     ├── index.js              1 个文件   138 行   装配：造对象、接线、生命周期
@@ -292,3 +293,7 @@ dsh-feishu-cui/
 
 - 反问里的多选题与全靠打字的题（让给网页端）；卡片上的自由输入（只有配对填码、会话重命名填名字这两张卡用）。
 - 卡片翻页（超 30KB 就只提示去网页端看）。
+
+## 更新日志
+
+见 [CHANGELOG.md](./CHANGELOG.md)。

@@ -41,6 +41,14 @@
     "@deepseek-ai/schemastery": "^3.18.4",
     "@larksuiteoapi/node-sdk": "^1.74.0"
   },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.7-rc.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
