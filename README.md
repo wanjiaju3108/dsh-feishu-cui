@@ -230,7 +230,7 @@ dsh-feishu-cui/
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
 - **`cache/`**：需要跨文件读写的运行期状态，只在内存里——在册的卡片、正在跑的那一轮、处理过的飞书消息、配对码、设置句柄、铸号。各 handler 自己私有那份（回答卡的定时器与改动队列、在册的提问、在册的审批）留在各自工厂里，不在这里。
 - **`common/`**：各层共用的形状、常量与文案——CUI 事件（`cui-event-schema.js`）、飞书事件名（`feishu-event.js`）、凭据引用名（`credential-refs.js`）、给人看的文案总表（`copy.js`）。
-- **`settings/`**：设置页。四条回环路由（`state` / `credentials` / `user/unbind` / `sleep-guard`，只判回环和 JSON，不做身份校验）+ 浏览器半边。
+- **`settings/`**：设置页。四条回环路由（`state` / `credentials` / `user/unbind` / `sleep-guard`，只判回环、`Host` 是回环主机名、写请求同源，以及 JSON；不做身份校验）+ 浏览器半边。
 
 依赖方向：`driving/` 认 `handler/` 和 `ui/`（只为拿卡片类型与判定原因那几个常量），`handler/` 能 import `ui/`、`infra/`、`cache/`、`common/`（文案在 `common/copy.js`），`ui/` 只 import `ui/`，`transport/` 只认 `common/`（事件名与凭据引用名），收到的东西交给装配时递进来的回调。
 
@@ -270,7 +270,7 @@ dsh-feishu-cui/
 
 ### F. 设置页（浏览器半边）
 
-`settings/panel.js` 挂四条只判回环与 JSON 的路由（`settings/http.js`）→ `settings/client.js` 在 DSH 设置面板里注册「飞书CUI会话」分区：填凭据、看状态与配对码、点解绑。
+`settings/panel.js` 挂四条路由（`settings/http.js`：只判回环、`Host` 必须是 `localhost` / `127.0.0.1` / `[::1]`、写请求带 `Origin` 时必须与 `Host` 同源，入参出参走 JSON）→ `settings/client.js` 在 DSH 设置面板里注册「飞书CUI会话」分区：填凭据、看状态与配对码、点解绑。
 
 ### G. 主动通知
 
