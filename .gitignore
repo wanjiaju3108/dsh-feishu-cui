@@ -2,3 +2,6 @@ node_modules/
 .idea/
 .DS_Store
 *.log
+
+# lockfile 不进版本库：它不在发布包的 files 里，装依赖产生的改动不该混进仓库
+package-lock.json
