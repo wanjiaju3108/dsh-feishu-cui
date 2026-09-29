@@ -22,7 +22,7 @@ check.eq('读状态：200', snapshot.status, 200);
 check.eq('读状态：回的是 JSON', snapshot.headers['content-type'], 'application/json; charset=utf-8');
 check.eq('快照里的字段', Object.keys(snapshot.json).sort(), [
   'appIdConfigured', 'appIdWritable', 'appSecretConfigured', 'appSecretWritable', 'connected', 'pairingCode',
-  'sleepGuard', 'userId',
+  'sleepGuard', 'userId', 'userName',
 ].sort());
 check.eq('没有在册的配对码时回 null', snapshot.json.pairingCode, null);
 
