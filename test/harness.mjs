@@ -449,12 +449,17 @@ export async function startPlugin({
    * @param deps.openId 点的人
    * @param deps.messageId 卡片所在消息 ID
    * @param deps.formValue 表单值（输入框卡片用）
+   * @param deps.checked 这一项的勾选状态（多选那道题靠它分「勾上」和「取消勾」）
    */
-  const cardAction = (value, { openId = stored.userId, messageId = 'om_sent_1', formValue } = {}) => (
+  const cardAction = (value, { openId = stored.userId, messageId = 'om_sent_1', formValue, checked } = {}) => (
     registry.dispatcher.dispatch('card.action.trigger', {
       context: { open_message_id: messageId },
       operator: { open_id: openId },
-      action: { value, ...(formValue === undefined ? {} : { form_value: formValue }) },
+      action: {
+        value,
+        ...(formValue === undefined ? {} : { form_value: formValue }),
+        ...(checked === undefined ? {} : { checked }),
+      },
       create_time: Date.now(),
     })
   );

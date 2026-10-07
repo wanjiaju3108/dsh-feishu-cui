@@ -4,7 +4,8 @@ import { bodyText, createCheck, libUrl, patchedCards, resetCalls, sentCards, sta
 
 const {
   APPROVAL_ALLOWED_TITLE, APPROVAL_CLOSED_TITLE, APPROVAL_REJECTED_TITLE,
-  QUESTION_CANCELLED_TITLE, QUESTION_CLOSED_TITLE, QUESTION_DONE_TITLE, QUESTION_UNSUPPORTED_TEXT,
+  QUESTION_CANCELLED_TITLE, QUESTION_CLOSED_TITLE, QUESTION_DONE_TITLE,
+  QUESTION_MULTI_SELECT_LABEL, QUESTION_SINGLE_SELECT_LABEL, QUESTION_UNSUPPORTED_TEXT,
 } = await import(libUrl('common/copy.js'));
 const { APPROVAL_CARD_BTN_ALLOW, APPROVAL_CARD_BTN_REJECT, APPROVAL_CARD_KEY } = await import(libUrl('ui/approval-card.js'));
 const { APPROVAL_REQUEST_EVENT } = await import(libUrl('handler/host/approval.js'));
@@ -30,6 +31,29 @@ const buttonValues = (node, out = []) => {
 };
 /** 最近一张卡片上某个按钮的回传值。 */
 const buttonOf = (btn) => buttonValues(sentCards().at(-1)).find((value) => value.btn === btn);
+/** 卡片上某一选项行（按它的 `value` 认）的回传值。 */
+const rowOf = (card, label) => buttonValues(card).find((value) => value.btn === 'pick' && value.value === label);
+/**
+ * 卡片上某一选项行现在勾没勾。
+ *
+ * @param card 卡片对象
+ * @param label 这一行的 `value`
+ * @returns `checked` 的值；卡上没这一行时 undefined
+ */
+const checkedOf = (card, label) => {
+  let found;
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    if (node.tag === 'checker' && node.behaviors?.[0]?.value?.value === label) found = node.checked;
+    Object.values(node).forEach(walk);
+  };
+  walk(card);
+  return found;
+};
 /** 这一轮的取消信号。 */
 const controller = new AbortController();
 /** 一道有选项、不多选的题。 */
@@ -75,10 +99,10 @@ await tick(30);
 check.eq('不是当前会话发起的：让给网页端', await app.ask(USER_QUESTIONS_EVENT, { questions, agent: { id: '别的会话' } }, next), 'next');
 check.eq('不是当前会话时不发卡片', sentCards().filter((card) => JSON.stringify(card).includes(`"${QUESTION_CARD_KEY}"`)).length, 0);
 
-// 4. 这批题飞书答不了（多选）：回一句，再让给网页端。
+// 4. 没有选项的题（全靠打字）还是答不了：回一句，再让给网页端。
 resetCalls();
-const multiSelect = [{ id: 'q1', question: '选几个', options: [{ label: 'A' }], multiSelect: true }];
-check.eq('多选题答不了：让给网页端', await app.ask(USER_QUESTIONS_EVENT, { questions: multiSelect, agent: { id: 'sess-1' } }, next), 'next');
+const noOptions = [{ id: 'q1', question: '说说你的想法' }];
+check.eq('没选项的题答不了：让给网页端', await app.ask(USER_QUESTIONS_EVENT, { questions: noOptions, agent: { id: 'sess-1' } }, next), 'next');
 check.ok('答不了时先回一句指路', bodyText(sentCards().at(-1)).includes(QUESTION_UNSUPPORTED_TEXT));
 
 // 5. 反问：发卡 → 点一行 → 交卷。
@@ -90,9 +114,11 @@ check.ok('反问卡发出来了', JSON.stringify(questionCard).includes(`"${QUES
 check.ok('卡上写着题的抬头与题面', bodyText(questionCard).includes('要不要继续') && bodyText(questionCard).includes('接着跑还是停？'));
 
 const pick = buttonOf('pick');
-await app.cardAction({ ...pick, value: '继续' });
+// 重画那张卡是这次回调的返回值，不走 `sendCard`，所以得从返回值里取。
+const repainted = await app.cardAction({ ...pick, value: '继续' });
 await tick(20);
-check.ok('点一行只选中：重画的卡上勾了这一行', JSON.stringify(sentCards().at(-1)).includes('继续'));
+check.eq('点一行只选中：重画的卡上勾了这一行', checkedOf(repainted.card.data, '继续'), true);
+check.eq('单选：别的行没勾', checkedOf(repainted.card.data, '停'), false);
 
 const confirm = buttonOf('confirm');
 const done = await app.cardAction({ tag: QUESTION_CARD_KEY, btn: confirm.btn, requestId: confirm.requestId, value: '继续' });
@@ -153,5 +179,94 @@ stopController.abort();
 await tick(30);
 check.eq('这一轮停了：审批交回 cancelled', (await closed).value, 'cancelled');
 check.eq('停了之后审批卡改成「已结束」', patchedCards().at(-1).header.title.content, APPROVAL_CLOSED_TITLE);
+
+// 11. 多选题：勾选项不重画卡片，勾几个交几个。
+resetCalls();
+const multiQuestions = [{
+  id: 'q1',
+  header: '挑几个',
+  question: '要哪几个？',
+  options: [{ label: 'A' }, { label: 'B' }, { label: 'C' }],
+  multiSelect: true,
+}];
+const multiAnswered = askAndSettle(USER_QUESTIONS_EVENT, { questions: multiQuestions, agent: { id: 'sess-1' } });
+await tick(30);
+const multiCard = sentCards().at(-1);
+check.ok('多选题发得出来', JSON.stringify(multiCard).includes(`"${QUESTION_CARD_KEY}"`));
+check.ok('卡上标了【多选】', bodyText(multiCard).includes(QUESTION_MULTI_SELECT_LABEL));
+
+check.eq('勾一项：不重画卡片', await app.cardAction({ ...rowOf(multiCard, 'A'), checked: true }), undefined);
+check.eq('再勾一项：还是不重画', await app.cardAction({ ...rowOf(multiCard, 'B'), checked: true }), undefined);
+await tick(20);
+check.eq('勾了两项，卡片没被换过', sentCards().at(-1), multiCard);
+
+const multiConfirm = buttonValues(multiCard).find((value) => value.btn === 'confirm');
+const multiDone = await app.cardAction({ tag: QUESTION_CARD_KEY, btn: multiConfirm.btn, requestId: multiConfirm.requestId });
+check.eq('多选交卷：勾上的都交回去', (await multiAnswered).value, { answers: [{ id: 'q1', selected: ['A', 'B'] }] });
+check.ok('交完卷卡片上两个标签都写着', bodyText(multiDone.card.data).includes('A') && bodyText(multiDone.card.data).includes('B'));
+
+// 12. 多选题：取消勾选要把那一项从答案里摘掉。
+resetCalls();
+const uncheckAnswered = askAndSettle(USER_QUESTIONS_EVENT, { questions: multiQuestions, agent: { id: 'sess-1' } });
+await tick(30);
+const uncheckCard = sentCards().at(-1);
+await app.cardAction({ ...rowOf(uncheckCard, 'A'), checked: true });
+await app.cardAction({ ...rowOf(uncheckCard, 'B'), checked: true });
+await app.cardAction({ ...rowOf(uncheckCard, 'A'), checked: false });
+await tick(20);
+const uncheckConfirm = buttonValues(uncheckCard).find((value) => value.btn === 'confirm');
+await app.cardAction({ tag: QUESTION_CARD_KEY, btn: uncheckConfirm.btn, requestId: uncheckConfirm.requestId });
+check.eq('取消勾选的那项不再交回去', (await uncheckAnswered).value, { answers: [{ id: 'q1', selected: ['B'] }] });
+
+// 13. 多选全取消：按跳过交回空选择。
+resetCalls();
+const emptiedAnswered = askAndSettle(USER_QUESTIONS_EVENT, { questions: multiQuestions, agent: { id: 'sess-1' } });
+await tick(30);
+const emptiedCard = sentCards().at(-1);
+await app.cardAction({ ...rowOf(emptiedCard, 'A'), checked: true });
+await app.cardAction({ ...rowOf(emptiedCard, 'A'), checked: false });
+await tick(20);
+const emptiedConfirm = buttonValues(emptiedCard).find((value) => value.btn === 'confirm');
+const emptiedDone = await app.cardAction({ tag: QUESTION_CARD_KEY, btn: emptiedConfirm.btn, requestId: emptiedConfirm.requestId });
+check.eq('全取消之后交回空选择', (await emptiedAnswered).value, { answers: [{ id: 'q1', selected: [] }] });
+check.ok('全取消之后卡片上写「已跳过」', bodyText(emptiedDone.card.data).includes('已跳过'));
+
+// 14. 单选那道题不受影响：连点两行只剩后点的那个。
+resetCalls();
+const singleAnswered = askAndSettle(USER_QUESTIONS_EVENT, { questions, agent: { id: 'sess-1' } });
+await tick(30);
+const singleCard = sentCards().at(-1);
+check.ok('单选题标的是【单选】', bodyText(singleCard).includes(QUESTION_SINGLE_SELECT_LABEL));
+await app.cardAction({ ...rowOf(singleCard, '继续'), checked: true });
+await tick(20);
+const singleRepainted = await app.cardAction({ ...rowOf(sentCards().at(-1), '停'), checked: true });
+await tick(20);
+check.eq('单选：重画后只剩后点的那个勾着', checkedOf(singleRepainted.card.data, '停'), true);
+check.eq('单选：先点的那个被顶掉了', checkedOf(singleRepainted.card.data, '继续'), false);
+const singleConfirm = buttonValues(sentCards().at(-1)).find((value) => value.btn === 'confirm');
+await app.cardAction({ tag: QUESTION_CARD_KEY, btn: singleConfirm.btn, requestId: singleConfirm.requestId });
+check.eq('单选：交卷只剩后点的那一个', (await singleAnswered).value, { answers: [{ id: 'q1', selected: ['停'] }] });
+
+// 15. 混合批次：多选勾了之后，单选那次重画要把多选的勾按账画回来。
+resetCalls();
+const mixedQuestions = [
+  { id: 'q1', header: '单选那道', question: '接着跑还是停？', options: [{ label: '继续' }, { label: '停' }] },
+  { id: 'q2', header: '多选那道', question: '要哪几个？', options: [{ label: 'X' }, { label: 'Y' }], multiSelect: true },
+];
+const mixedAnswered = askAndSettle(USER_QUESTIONS_EVENT, { questions: mixedQuestions, agent: { id: 'sess-1' } });
+await tick(30);
+const mixedCard = sentCards().at(-1);
+await app.cardAction({ ...rowOf(mixedCard, 'X'), checked: true });
+await tick(20);
+const mixedRepainted = await app.cardAction({ ...rowOf(sentCards().at(-1), '继续'), checked: true });
+await tick(20);
+check.eq('单选那次重画把多选勾的 X 画回来了', checkedOf(mixedRepainted.card.data, 'X'), true);
+check.eq('单选勾的是后点的那个', checkedOf(mixedRepainted.card.data, '继续'), true);
+check.eq('单选另一个没勾', checkedOf(mixedRepainted.card.data, '停'), false);
+const mixedConfirm = buttonValues(sentCards().at(-1)).find((value) => value.btn === 'confirm');
+await app.cardAction({ tag: QUESTION_CARD_KEY, btn: mixedConfirm.btn, requestId: mixedConfirm.requestId });
+check.eq('混合批次：两道题各交各的', (await mixedAnswered).value, {
+  answers: [{ id: 'q1', selected: ['继续'] }, { id: 'q2', selected: ['X'] }],
+});
 
 check.finish();
