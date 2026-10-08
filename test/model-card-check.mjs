@@ -1,4 +1,4 @@
-/** 模型卡片：发卡、没会话、目录空、确定（先回已请求、再提交给宿主）、提交失败、选了目录里没有的。 */
+/** 模型卡片：发卡（按 provider 分组）、没会话、目录空、确定（先回已请求、再提交给宿主）、提交失败、选了目录里没有的、当前模型在第二组时直接确定。 */
 
 import { cardText, createCheck, createLogger, createPush, installSettings, libUrl, responseCard, tick } from './harness.mjs';
 
@@ -25,6 +25,11 @@ const groups = [
       { id: 'chat2', name: 'chat2', reasoning: { efforts: [{ id: 'high', name: '高' }] } },
     ],
   },
+  {
+    id: 'qwen',
+    name: 'Qwen Plan',
+    models: [{ id: 'qwen-max', name: 'qwen-max' }],
+  },
 ];
 const selected = [];
 let selectResult = { ok: true };
@@ -48,11 +53,62 @@ const cardEvent = (over = {}) => ({
   ...over,
 });
 
+/**
+ * 从卡片 JSON 里找某个值那一行选项的勾选状态。
+ *
+ * @param card 卡片对象
+ * @param value 选项行的值（`服务商/模型`）
+ * @returns `checked`；卡上没有这一行时 undefined
+ */
+const checkedOf = (card, value) => {
+  let found;
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    if (node.tag === 'checker' && node.behaviors?.[0]?.value?.value === value) found = node.checked;
+    Object.values(node).forEach(walk);
+  };
+  walk(card);
+  return found;
+};
+
+/**
+ * 从卡片 JSON 里找「确定」按钮烘的那个值。
+ *
+ * @param card 卡片对象
+ * @returns 按钮 behaviors 里的 `value`；找不到时 undefined
+ */
+const confirmValueOf = (card) => {
+  let found;
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node.behaviors)) {
+      for (const behavior of node.behaviors) {
+        if (behavior?.value?.btn === 'confirm') found = behavior.value.value;
+      }
+    }
+    Object.values(node).forEach(walk);
+  };
+  walk(card);
+  return found;
+};
+
 await handler.pushModelCard({ operatorId: 'u1' });
 check.eq('点菜单发一张模型卡', sent.length, 1);
 check.ok('卡片类型是 model', JSON.stringify(sent[0].card).includes('"model"'));
 check.ok('卡片里列了目录里的模型', JSON.stringify(sent[0].card).includes('chat2'));
 check.ok('卡片上写着当前是哪个', cardText(sent[0].card).includes('chat'));
+check.ok('卡片上带两个 provider 的组抬头', cardText(sent[0].card).includes('Qwen Plan') && cardText(sent[0].card).includes('**DeepSeek**'));
+check.eq('勾落在当前模型那一行', checkedOf(sent[0].card, 'deepseek/chat'), true);
+check.eq('别的 provider 的行没勾', checkedOf(sent[0].card, 'qwen/qwen-max'), false);
+check.eq('确定按钮烘的是当前模型', confirmValueOf(sent[0].card), 'deepseek/chat');
 
 const requested = await handler.handleModelCard(cardEvent());
 check.ok('确定：先把「已请求」那句换上去', cardText(responseCard(requested)).includes('已请求'));
@@ -86,6 +142,23 @@ selectResult = { ok: true };
 await handler.pushModelCard({ operatorId: 'u1' });
 const gone = await handler.handleModelCard(cardEvent({ content: { value: { tag: 'model', btn: 'confirm', value: 'deepseek/nope' } } }));
 check.ok('选了目录里没有的：卡上写一句重选', cardText(responseCard(gone)).includes(MODEL_GONE_ERROR));
+
+// 当前模型在第二个 provider 组：勾要落对组，确定按钮要烘上它的值，不点行直接确定不能按取消算。
+current = { provider: 'qwen', model: 'qwen-max' };
+sent.length = 0;
+selected.length = 0;
+patched.length = 0;
+await handler.pushModelCard({ operatorId: 'u1' });
+check.eq('当前模型在第二组：勾落在第二组', checkedOf(sent[0].card, 'qwen/qwen-max'), true);
+check.eq('当前模型在第二组：第一组的行没勾', checkedOf(sent[0].card, 'deepseek/chat'), false);
+check.eq('当前模型在第二组：确定按钮烘的是它的值', confirmValueOf(sent[0].card), 'qwen/qwen-max');
+const bakedConfirm = await handler.handleModelCard(cardEvent({
+  content: { value: { tag: 'model', btn: 'confirm', value: confirmValueOf(sent[0].card) } },
+}));
+check.ok('当前模型在第二组：直接点确定先回「已请求」', cardText(responseCard(bakedConfirm)).includes('已请求'));
+await tick();
+check.eq('当前模型在第二组：直接点确定把它交给宿主', selected, [{ sessionId: 's1', provider: 'qwen', model: 'qwen-max' }]);
+current = { provider: 'deepseek', model: 'chat' };
 
 settings.set({ sessionId: '' });
 sent.length = 0;
