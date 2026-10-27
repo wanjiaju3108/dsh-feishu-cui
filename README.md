@@ -34,7 +34,7 @@
 **不做什么（能力边界，详细取舍见[边界与约定](#边界与约定)）**
 
 - **只服务 owner 一个人**：别人发消息、点菜单一律回同一句「CUI会话未匹配」，且不区分「还没绑定」和「不是 owner」。
-- **只认私聊、只认文本**：图片 / 文件 / 附件**永不支持**。
+- **只认私聊**：支持文本、图片、文件和 `post` 富文本；语音、视频、表情包不支持。
 - **只认「飞书当前会话」**：别的会话怎么聊都不回答、也不推送。
 - 反问只接「有选项」的题；全靠打字的题让给网页端（让路之前先回一句「这题飞书答不了」）。单选与多选都接，每题在卡片上标着【单选】/【多选】。
 - 模型 / 推理深度 / 权限都是**会话级**设置，只作用于当前会话。
@@ -87,7 +87,7 @@ dsh plugin --profile web add dsh-feishu-cui
 - 事件与回调的订阅方式选 **长连接**；
 - 事件加 `im.message.receive_v1`、`application.bot.menu_v6`；
 - 卡片回调加 `card.action.trigger`；
-- 权限补 `im:message.p2p_msg:readonly`、`im:message:send_as_bot`。
+- 权限补 `im:message.p2p_msg:readonly`、`im:message:send_as_bot`、`im:message:readonly`（下载消息里的图片/文件）。
 - 想在设置页看到绑定人的**姓名**，再加**两条**权限（控制台里按后面括号里的词搜）：
   - `contact:contact.base:readonly`（接口级，加了接口才调得通；搜「通讯录」）；
   - `contact:user.base:readonly`（字段级，接口通了之后靠它响应里才带姓名；搜「用户基本信息」）——只加前一条的话，接口返回成功但姓名是空的。
@@ -149,7 +149,7 @@ dsh plugin --profile web add dsh-feishu-cui
   **「停止」**：打断当前这一轮（跟网页端「停止生成」同一件事，走会话控制器的取消）——只停正在跑的这轮，**已经在队列里排着的不受影响**。点完先变「正在停止」，这一轮真正收尾时把已产出的正文留着、标题改成「已停止」。按钮只出现在**飞书自己发起**的那一轮。
   **「撤回」**：把还没开跑的那条从队列里撤掉（走宿主的排队项移除），卡片换成「对话已取消」。
   正文装不进一张卡片（超过 30KB）就**不再往上接**：卡片换成「任务失败」+「回答内容过多，卡片无法全部展示，请到网页端查看」。
-  还没选会话时回一句「还没有当前会话」；不是文本的消息回一句「只支持文本消息」（**图片 / 附件永不支持**）。
+  还没选会话时回一句「还没有当前会话」；语音、视频、表情包这类不支持的消息回一句「只支持文本、图片或文件消息」。
   投喂走宿主的会话控制器（`mode: 'queue'`），不是自己往会话日志里塞事件——模型可用性、会话是否还在这些校验都交给宿主。
 - **会话列表**里只列**当前工作区**的会话，摘要写「本工作区有 N 个会话」；一次都没跑过的空会话（没标题那种）不列。底部「新建」会在当前工作区里开一个新会话并切过去。
 - **会话重命名**改的是**当前会话**：点菜单发一张输入框卡片，填新名字、点「确定」；名字由宿主归一化（去掉转义序列与控制字符、空白压成一个、超长按字节截断），卡片先换成「已请求：会话改名为【X】」，宿主要是没收下就另发一张卡写「会话改名失败」；真改成了由宿主那条事件发一张「会话名已修改」。
@@ -182,7 +182,7 @@ dsh plugin --profile web add dsh-feishu-cui
 | 菜单点了没反应，日志里写「这个菜单项还没有去处：…」 | 飞书后台那一项的 `event_key` 和上表不一致；**或者你给父菜单配了事件**（父菜单只当容器，不该推事件） |
 | 回「CUI会话未匹配」 | 还没配对，或者发消息的人不是 owner |
 | 回「还没有当前会话」 | 先去菜单里选一个会话 |
-| 回「只支持文本消息」 | 发的是图片 / 文件 / 附件（永不支持） |
+| 回「只支持文本、图片或文件消息」 | 发的是语音 / 视频 / 表情包 |
 | 卡片点了只回「这张卡片已失效…」 | 这张卡已经被新卡顶掉，或者已经处理过了 |
 | 设置卡点完只留「已请求：…」 | 这是设计：请求交出去了，结果一律另发一张卡——成功是宿主那条事件发的「…已修改」，失败是「…失败」那张 |
 | 反问卡没弹到飞书 | 这一轮不是飞书发起的（让给网页端了）；或者有题目没选项 |
@@ -232,7 +232,7 @@ dsh-feishu-cui/
 - **`init.js`**：启动时那一步初始化。读配置里配的当前会话，问宿主还在不在（`session.js` 的 `hasSession`），把结论写进 `cache/current-session.js`；之后上层读 `readSettings()` 拿到的就是这个缓存，不再问宿主。
 - **`notices.js`**：给绑定的那个人发卡。连接状态变了发一张「dsh 已连接，当前会话为【…】」；解绑时把 user 清掉、在册的配对码一起作废，再给原 user 发一张「已解绑」。
 - **`transport/`**：门外那一段。`feishu/` 是飞书侧（`websocket-client.js` 长连接与心跳看门狗、`http-client.js` REST、`transport.js` 把两个客户端一起持有、换凭据时整组重建）；`host/` 是宿主侧（`session-events.js` 订 `session/event`、`agent-events.js` 订收件箱三条、`waterfall.js` 订要人答的两条 waterfall）。
-- **`driving/`**：判定和分派。`feishu/` 把飞书原始事件转成 CUI 事件（`receiver.js`）、判准入（`admission.js`：去重、迟到、鉴权、只认文本、有没有当前会话）、按事件分给处理函数（`router.js`）；`host/` 对宿主事件做同样三件事，`router.js` 只把要盯的那几种事件分给 `handler/host/`。
+- **`driving/`**：判定和分派。`feishu/` 把飞书原始事件转成 CUI 事件（`receiver.js`）、判准入（`admission.js`：去重、迟到、鉴权、有没有文本或附件、有没有当前会话）、按事件分给处理函数（`router.js`）；`host/` 对宿主事件做同样三件事，`router.js` 只把要盯的那几种事件分给 `handler/host/`。
 - **`handler/`**：干活的地方。`feishu/` 是菜单和卡片点出来的（七个菜单各一张卡 + `option-card-flow.js`、`input-card-flow.js` 两套共用骨架 + `deferred-submit.js` 两套共用的后台提交 + `message.js` 投喂 + `pairing.js` 配对 + `session-rename.js` 会话重命名 + `warn.js` 判定没过时回话）；`host/` 是宿主推过来的（`waterfall.js` 是反问与审批共用的骨架 + `answer.js` 回答卡、`question.js` 反问卡、`approval.js` 审批卡、`settings-watch.js` 设置变更通知）。
 - **`infra/`**：跟外面的接口。`feishu/request.js` 是公共的请求骨架（成功判定与重试），出站和查姓名都用它；`feishu/push.js` 发出站（发卡 / 换卡）；`feishu/user-name.js` 拿 open_id 经通讯录查姓名；`host/` 是宿主服务的封装（会话、工作区、模型目录、权限、余额，以及按名字借服务的取用口）；`plugin/` 是插件自己的配置与凭据（走宿主的 `settings` / `credentials` 服务）；`system/sleep-guard.js` 是插件自己起本机进程那块——持有一个 `caffeinate -s`，插件跑着就防休眠。
 - **`ui/`**：只造卡片 JSON。六种：`text-card.js`（只有正文 / 带标题栏两种）、`option-card.js`（选项卡：确定|取消，和确定|新建|取消两种）、`input-card.js`（输入框）、`answer-card.js`（带一个按钮的回答卡）、`approval-card.js`（允许|拒绝）、`card.js`（共用件）。给人看的字一律不在这里。
@@ -248,7 +248,7 @@ dsh-feishu-cui/
 
 ### A. 入站：飞书 → 会话
 
-`transport/feishu/websocket-client.js`（长连接收到私聊消息）→ `driving/feishu/receiver.js`（转成 CUI 事件：正文、消息 ID、操作者）→ `driving/feishu/admission.js`（过期丢弃 → 查重记账 → 是不是 owner → 是不是文本 → 有没有当前会话）→ `driving/feishu/router.js` → `handler/feishu/message.js` → `infra/host/session.js`（`prompt`）→ 宿主的会话控制器（`mode: 'queue'`）。
+`transport/feishu/websocket-client.js`（长连接收到私聊消息）→ `driving/feishu/receiver.js`（转成 CUI 事件：正文、附件、消息 ID、操作者）→ `driving/feishu/admission.js`（过期丢弃 → 查重记账 → 是不是 owner → 有没有文本或附件 → 有没有当前会话）→ `driving/feishu/router.js` → `handler/feishu/message.js` → `infra/host/session.js`（`prompt`）→ 宿主的会话控制器（`mode: 'queue'`）。
 
 投喂进去的那条随后会被宿主取走：`transport/host/agent-events.js`（`agent/inbox/inserted` / `claimed` / `discarded`）→ `driving/host/receiver.js` → `driving/host/router.js` → `handler/host/answer.js`（开卡 / 改标题 / 撤回），并把「这一轮是哪条飞书消息」记进 `cache/running-turn.js`。
 

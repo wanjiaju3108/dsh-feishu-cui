@@ -6,7 +6,16 @@
  * `@larksuiteoapi/node-sdk` 换成本文件。
  */
 
+import { Readable } from 'node:stream';
+import fs from 'node:fs/promises';
+
 export const Domain = { Feishu: 'https://open.feishu.cn', Lark: 'https://open.larksuite.com' };
+
+/** 1x1 PNG；图片下载用例只需要能被文件头认出来。 */
+const PNG_BYTES = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 export const LoggerLevel = { trace: 0, debug: 1, info: 2, warn: 3, error: 4, fatal: 5 };
 
@@ -123,6 +132,27 @@ export class Client {
   constructor(options) {
     this.options = options;
     this.im = {
+      v1: {
+        messageResource: {
+          get: async ({ path, params }) => {
+            registry.calls.push({
+              kind: 'messageResource.get',
+              messageId: path.message_id,
+              fileKey: path.file_key,
+              type: params?.type,
+            });
+            if (params?.type === 'image') {
+              return { getReadableStream: () => Readable.from([PNG_BYTES]) };
+            }
+            return {
+              writeFile: async (target) => {
+                await fs.writeFile(target, Buffer.from('file-bytes'));
+                return target;
+              },
+            };
+          },
+        },
+      },
       message: {
         reply: async ({ path, data }) => send({
           kind: 'message.reply',

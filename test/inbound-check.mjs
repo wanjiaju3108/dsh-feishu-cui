@@ -5,7 +5,7 @@ import {
 } from './harness.mjs';
 
 const {
-  NOT_MATCHED_TEXT, NO_CURRENT_SESSION_TEXT, PAIRING_SUCCESS_TEXT, SESSION_CARD_TITLE, UNSUPPORTED_MESSAGE_TEXT,
+  NOT_MATCHED_TEXT, NO_CURRENT_SESSION_TEXT, PAIRING_SUCCESS_TEXT, SESSION_CARD_TITLE,
 } = await import(libUrl('common/copy.js'));
 const { PAIRING_KEY } = await import(libUrl('handler/feishu/pairing.js'));
 const { SESSION_LIST_KEY } = await import(libUrl('handler/feishu/sessions.js'));
@@ -54,7 +54,7 @@ check.eq('同一条消息重投不答两遍', app.calls.prompt.length, 1);
 
 resetCalls();
 await app.incoming({ messageId: 'om_3', messageType: 'image', content: JSON.stringify({ image_key: 'img_1' }) });
-check.eq('图片消息：回「只支持文本消息」', cardText(lastCard()), UNSUPPORTED_MESSAGE_TEXT);
+check.eq('图片消息：交给会话的是 image 块', app.calls.prompt.at(-1)?.content?.[0]?.type, 'image');
 
 resetCalls();
 await app.incoming({ messageId: 'om_4', text: '你好', openId: 'ou_stranger' });
